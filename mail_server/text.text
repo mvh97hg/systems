@@ -1,0 +1,40 @@
+useradd -m -d /opt/zimbra -s /bin/bash zimbra
+
+./install.sh --platform-override
+
+#bật DKIM
+su - zimbra -c "/opt/zimbra/libexec/zmdkimkeyutil -a -d mail.xn--hngmv-1ua.vn" > /root/$DOMAIN-dkim.txt
+#xem thông tin dkim nếu đã được bật
+su - zimbra -c "/opt/zimbra/libexec/zmdkimkeyutil -q -d mail.xn--hngmv-1ua.vn"
+
+##DKIM
+6C6D340A-E53B-11ED-AF37-7E10530FC5BB._domainkey.mail	IN	TXT	
+    
+"v=DKIM1; k=rsa; p=p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAptC7mwxAln82hLgD95HqwO4lWeVLvQVzoUqim4jyMBdMa0Ox6y5d8yFJwh45L6q44vPhWB4ioQ1OAtQLUyncV+rato2ymAZY3TX3Priifp7a6YtRFkDkU9QF876IX5hrcfu9d5nXbf7DScswWPnqJ7dD1OHo4emxO2NZ49w+PAx/4bfLp1iKjDRT55Dm1YOSihfP6M2Eu1l1zQaVtzh5FSB3/7EA9hYXZIG+PNkGloMJGI95rpbzIU3egPZ6vriVlhtfmZnvXBvfwjvMtp8WVEu0bmBajmx99Kfcg4WUTPMEgeTaSmZ5mrqj3XQsG/LtedG4tUNETY/dT6maLgxNyQIDAQAB"
+
+##SPF
+
+v=spf1 a a:spf.vinahost.vn mx +include:sendgrid.net +include:mtpservice.net +ip4=103.9.77.116  ~all
+
+
+cat >> /usr/local/sbin/letsencrypt-zimbra << EOF
+#!/bin/bash
+/usr/local/sbin/certbot certonly -d $(hostname --fqdn) --standalone -n --preferred-chain  "ISRG Root X1" --agree-tos --register-unsafely-without-email --key-type rsa
+cp "/etc/letsencrypt/live/$(hostname --fqdn)/privkey.pem" /opt/zimbra/ssl/zimbra/commercial/commercial.key
+chown zimbra:zimbra /opt/zimbra/ssl/zimbra/commercial/commercial.key
+wget -O /tmp/ISRG-X1.pem https://letsencrypt.org/certs/isrgrootx1.pem.txt
+rm -f "/etc/letsencrypt/live/$(hostname --fqdn)/chainZimbra.pem"
+cp "/etc/letsencrypt/live/$(hostname --fqdn)/chain.pem" "/etc/letsencrypt/live/$(hostname --fqdn)/chainZimbra.pem"
+cat /tmp/ISRG-X1.pem >> "/etc/letsencrypt/live/$(hostname --fqdn)/chainZimbra.pem"
+chown zimbra:zimbra /etc/letsencrypt -R
+cd /tmp
+su zimbra -c '/opt/zimbra/bin/zmcertmgr deploycrt comm "/etc/letsencrypt/live/$(hostname --fqdn)/cert.pem" "/etc/letsencrypt/live/$(hostname --fqdn)/chainZimbra.pem"'
+rm -f "/etc/letsencrypt/live/$(hostname --fqdn)/chainZimbra.pem"
+EOF
+
+chmod +rx /usr/local/sbin/letsencrypt-zimbra
+ln -s /usr/local/sbin/letsencrypt-zimbra /etc/cron.daily/letsencrypt-zimbra
+/etc/cron.daily/letsencrypt-zimbra
+
+
+su zimbra -c '/opt/zimbra/bin/zmcontrol restart'

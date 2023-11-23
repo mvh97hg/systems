@@ -1,0 +1,17 @@
+#b1 stop mysql
+sudo systemctl stop mysql
+
+#b2 start mysql_safe
+mysqld_safe --skip-grant-tables &
+#b3 login
+mysql -u root
+#change password
+FLUSH PRIVILEGES;
+SET PASSWORD FOR 'root'@'localhost' = 'Hmv@12345';
+# or
+USE mysql;
+UPDATE user SET Password = PASSWORD('Hmv@12345')
+   WHERE Host = 'localhost' AND User = 'root';
+# or
+FLUSH PRIVILEGES;
+ALTER USER 'root'@'localhost' IDENTIFIED BY 'new_password';
