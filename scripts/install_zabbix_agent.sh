@@ -31,8 +31,8 @@ check_zabbix_agent_installed() {
   fi
 }
 config_zabbix_agent() {
-  sed -i "s/Server=127.0.0.1/Server=103.9.76.169/" /etc/zabbix/zabbix_agentd.conf
-  sed -i "s/ServerActive=127.0.0.1/ServerActive=103.9.76.169/" /etc/zabbix/zabbix_agentd.conf
+  sed -i "s/Server=127.0.0.1/Server=123.30.129.252/" /etc/zabbix/zabbix_agentd.conf
+  sed -i "s/ServerActive=127.0.0.1/ServerActive=123.30.129.252/" /etc/zabbix/zabbix_agentd.conf
   sed -i "s/Hostname=Zabbix server/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agentd.conf
   sed -i "s/# HostMetadata=/HostMetadata=Client_7days/" /etc/zabbix/zabbix_agentd.conf
 
@@ -46,10 +46,13 @@ config_zabbix_agent() {
 # Install and configure Zabbix Agent on CentOS
 install_zabbix_agent_centos() {
   # Install dependencies
-  yum install -y https://repo.zabbix.com/zabbix/4.4/rhel/7/x86_64/zabbix-agent-4.4.10-1.el7.x86_64.rpm
-
+  rpm -Uvh https://repo.zabbix.com/zabbix/6.0/rhel/7/x86_64/zabbix-release-6.0-4.el7.noarch.rpm
+  yum clean all
+  yum install zabbix-agent
   # Configure Zabbix Agent
   config_zabbix_agent
+  systemctl restart zabbix-agent
+  systemctl enable zabbix-agent
 }
 
 # Install and configure Zabbix Agent on Ubuntu
@@ -57,13 +60,15 @@ install_zabbix_agent_ubuntu() {
   # Install dependencies
   apt-get update
   apt-get install -y wget
-  wget https://repo.zabbix.com/zabbix/4.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_4.4-1+bionic_all.deb
-  dpkg -i zabbix-release_4.4-1+bionic_all.deb
+  wget https://repo.zabbix.com/zabbix/6.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_6.0-4+ubuntu20.04_all.deb
+  dpkg -i zabbix-release_6.0-4+ubuntu20.04_all.deb
   apt-get update
-  apt-get install -y zabbix-agent=1:4.4.10-1+bionic
+  apt install zabbix-agent
 
   # Configure Zabbix Agent
   config_zabbix_agent
+  systemctl restart zabbix-agent
+  systemctl enable zabbix-agent
 }
 
 # Uninstall Zabbix Agent
