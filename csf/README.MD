@@ -12,7 +12,8 @@
     ```
 4. Cài ipset
     ```
-    apt install ipset
+    apt install ipset -y
+    apt-get install -y libwww-perl liblwp-protocol-https-perl libgd-graph-perl
     ```
 5. Restart csf và kiểm tra kết quả
     ```
