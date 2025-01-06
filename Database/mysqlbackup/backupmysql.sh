@@ -14,7 +14,7 @@ function die () {
 
 CONFIG=${1:-`dirname $0`/backupmysql.conf}
 [ -f "$CONFIG" ] && . "$CONFIG" || die "Could not load configuration file ${CONFIG}!"
-
+BACKDIR="$BACKDIR/$(date -u +'%Y')/$(date -u +'%m')/$(date -u +'%d')"
 # check of the backup directory exists
 # if not, create it
 if  [ ! -d $BACKDIR ]; then
@@ -50,8 +50,8 @@ for KEY in "${!DBHOST[@]}"; do
     echo -n "Backing up database $database..."
     test ${DBHOST[$KEY]} = "localhost" && SERVER=`hostname -f` || SERVER=${DBHOST[$KEY]}
     mysqldump --host ${DBHOST[$KEY]} --port ${DBPORT[$KEY]} --user=${DBUSER[$KEY]} --password=${DBPASS[$KEY]} \
-      ${DBOPTIONS[$KEY]} $database $TABLES > $BACKDIR/$SERVER-$database-$DATE-mysqlbackup.sql
-    $COMPRESSION_COMMAND $BACKDIR/$SERVER-$database-$DATE-mysqlbackup.sql
+      ${DBOPTIONS[$KEY]} $database $TABLES > $BACKDIR/$SERVER_$database_$DATE.sql
+    $COMPRESSION_COMMAND $BACKDIR/$SERVER_$database_$DATE.sql
     echo "done!"
   done
 done
@@ -97,7 +97,7 @@ if  [ $FTP = "y" ]; then
   echo "Initiating FTP connection..."
 
   cd $BACKDIR
-  ATTACH=`for file in *$DATE-mysqlbackup.sql.$COMPRESSION_EXTENSION; do echo -n -e "put ${file}\n"; done`
+  ATTACH=`for file in *$DATE.sql.$COMPRESSION_EXTENSION; do echo -n -e "put ${file}\n"; done`
 
   for KEY in "${!FTPHOST[@]}"; do
     echo -e "\nConnecting to ${FTPHOST[$KEY]} with user ${FTPUSER[$KEY]}..."
