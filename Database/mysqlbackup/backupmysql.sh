@@ -50,8 +50,8 @@ for KEY in "${!DBHOST[@]}"; do
     echo -n "Backing up database $database..."
     test ${DBHOST[$KEY]} = "localhost" && SERVER=`hostname -f` || SERVER=${DBHOST[$KEY]}
     mysqldump --host ${DBHOST[$KEY]} --port ${DBPORT[$KEY]} --user=${DBUSER[$KEY]} --password=${DBPASS[$KEY]} \
-      ${DBOPTIONS[$KEY]} $database $TABLES > $BACKDIR/$SERVER_$database_$DATE.sql
-    $COMPRESSION_COMMAND $BACKDIR/$SERVER_$database_$DATE.sql
+      ${DBOPTIONS[$KEY]} $database $TABLES > $BACKDIR/$SERVER-$database-$DATE.sql
+    $COMPRESSION_COMMAND $BACKDIR/$SERVER-$database-$DATE.sql
     echo "done!"
   done
 done
