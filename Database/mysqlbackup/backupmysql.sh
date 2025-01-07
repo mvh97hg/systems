@@ -1,7 +1,7 @@
 #! /bin/bash
 
 # Hungmv
-# fork from http://www.ameir.net
+# fork from https://github.com/ameir.git
 # 
 # 
 
@@ -62,8 +62,8 @@ done
 
 if  [ $MAIL = "y" ]; then
   BODY="Your backup is ready! Find more useful scripts and info at http://www.ameir.net. \n\n"
-  BODY=$BODY`cd $BACKDIR; for file in *$DATE-mysqlbackup.sql.$COMPRESSION_EXTENSION; do md5sum ${file};  done`
-  ATTACH=`for file in $BACKDIR/*$DATE-mysqlbackup.sql.$COMPRESSION_EXTENSION; do echo -n "-a ${file} ";  done`
+  BODY=$BODY`cd $BACKDIR; for file in *$DATE.sql.$COMPRESSION_EXTENSION; do md5sum ${file};  done`
+  ATTACH=`for file in $BACKDIR/*$DATE.sql.$COMPRESSION_EXTENSION; do echo -n "-a ${file} ";  done`
 
   echo -e "$BODY" | mutt -s "$SUBJECT" $ATTACH -- $EMAILS
   if [[ $? -ne 0 ]]; then
@@ -74,7 +74,7 @@ if  [ $MAIL = "y" ]; then
 fi
 
 if  [ $DELETE = "y" ]; then
-  OLDDBS=`cd $BACKDIR; find . -name "*-mysqlbackup.sql.$COMPRESSION_EXTENSION" -mtime +$DAYS`
+  OLDDBS=`cd $BACKDIR; find . -name "*.sql.$COMPRESSION_EXTENSION" -mtime +$DAYS`
   REMOVE=`for file in $OLDDBS; do echo -n -e "delete ${file}\n"; done` # will be used in FTP
 
   cd $BACKDIR; for file in $OLDDBS; do rm -v ${file}; done
