@@ -7,14 +7,14 @@
 
 #----------------------Start of Script------------------#
 current_timezone=$(timedatectl | grep "Time zone" | awk '{print $3}')
-if [ "$current_timezone" != "$TIMEZONE" ]; then
-    echo "Current timezone is $current_timezone. Changing timezone to $TIMEZONE..."
+if [ "$current_timezone" != "$TZ" ]; then
+    echo "Current timezone is $current_timezone. Changing timezone to $TZ..."
     #Change timezone
-    sudo timedatectl set-timezone $TIMEZONE
+    sudo timedatectl set-timezone $TZ
     sudo timedatectl set-local-rtc 1
-    echo "Timezone has been changed to $TIMEZONE."
+    echo "Timezone has been changed to $TZ."
 else
-    echo "Timezone is already $TIMEZONE, no need to change."
+    echo "Timezone is already $TZ, no need to change."
 fi
 
 install_sshpass() {
