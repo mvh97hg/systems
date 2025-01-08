@@ -10,6 +10,10 @@ if [ -z "$SERVER_IP" ]; then
   echo "Thieu IP Zabbix Server"
   exit 1
 fi
+if ! echo "$SERVER_IP" | grep -Pq '^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'; then
+  echo "Dia chi IP khong hop le: $SERVER_IP"
+  exit 1
+fi
 
 # Detect the operating system
 if [ -f /etc/redhat-release ]; then
