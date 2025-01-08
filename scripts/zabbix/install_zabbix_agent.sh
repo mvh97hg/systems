@@ -61,7 +61,7 @@ install_zabbix_agent_centos() {
   # Install dependencies
   rpm -Uvh https://repo.zabbix.com/zabbix/6.0/rhel/7/x86_64/zabbix-release-6.0-4.el7.noarch.rpm
   yum clean all
-  yum install zabbix-agent
+  yum install zabbix-agent -y
   # Configure Zabbix Agent
   config_zabbix_agent
   systemctl restart zabbix-agent
@@ -76,7 +76,7 @@ install_zabbix_agent_ubuntu() {
   wget https://repo.zabbix.com/zabbix/6.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_6.0-4+ubuntu20.04_all.deb
   dpkg -i zabbix-release_6.0-4+ubuntu20.04_all.deb
   apt-get update
-  apt install zabbix-agent
+  apt install zabbix-agent -y
 
   # Configure Zabbix Agent
   config_zabbix_agent
