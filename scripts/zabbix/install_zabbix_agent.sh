@@ -2,6 +2,14 @@
 
 # Get the current system hostname
 HOSTNAME=$(hostname)
+read -p "Nhap IP Zabbix Server: " SERVER_IP
+
+read -p "Nhap Host Metadata: " HOST_METADATA
+
+if [ -z "$SERVER_IP" ]; then
+  echo "Thieu IP Zabbix Server"
+  exit 1
+fi
 
 # Detect the operating system
 if [ -f /etc/redhat-release ]; then
@@ -31,9 +39,11 @@ check_zabbix_agent_installed() {
   fi
 }
 config_zabbix_agent() {
-  sed -i "s/Server=127.0.0.1/Server=$1" /etc/zabbix/zabbix_agentd.conf
-  sed -i "s/ServerActive=127.0.0.1/ServerActive=$1/" /etc/zabbix/zabbix_agentd.conf
-  sed -i "s/# HostMetadata=/HostMetadata=$2/" /etc/zabbix/zabbix_agentd.conf
+  sed -i "s/Server=127.0.0.1/Server=$SERVER_IP" /etc/zabbix/zabbix_agentd.conf
+  sed -i "s/ServerActive=127.0.0.1/ServerActive=$SERVER_IP/" /etc/zabbix/zabbix_agentd.conf
+  if [ -n "$HOST_METADATA" ]; then
+    sed -i "s/# HostMetadata=/HostMetadata=$HOST_METADATA/" /etc/zabbix/zabbix_agentd.conf
+  fi
 
 
   # Start Zabbix Agent
