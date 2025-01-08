@@ -6,6 +6,17 @@
 # 
 
 #----------------------Start of Script------------------#
+current_timezone=$(timedatectl | grep "Time zone" | awk '{print $3}')
+if [ "$current_timezone" != "$TIMEZONE" ]; then
+    echo "Current timezone is $current_timezone. Changing timezone to $TIMEZONE..."
+    #Change timezone
+    sudo timedatectl set-timezone $TIMEZONE
+    sudo timedatectl set-local-rtc 1
+    echo "Timezone has been changed to $TIMEZONE."
+else
+    echo "Timezone is already $TIMEZONE, no need to change."
+fi
+
 install_sshpass() {
     if ! command -v sshpass &> /dev/null; then
         echo "sshpass not installed. Installing..."
