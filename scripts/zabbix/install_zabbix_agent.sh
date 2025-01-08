@@ -31,10 +31,9 @@ check_zabbix_agent_installed() {
   fi
 }
 config_zabbix_agent() {
-  sed -i "s/Server=127.0.0.1/Server=123.30.129.252/" /etc/zabbix/zabbix_agentd.conf
-  sed -i "s/ServerActive=127.0.0.1/ServerActive=123.30.129.252/" /etc/zabbix/zabbix_agentd.conf
-  sed -i "s/Hostname=Zabbix server/Hostname=$HOSTNAME/" /etc/zabbix/zabbix_agentd.conf
-  sed -i "s/# HostMetadata=/HostMetadata=Client_7days/" /etc/zabbix/zabbix_agentd.conf
+  sed -i "s/Server=127.0.0.1/Server=$1" /etc/zabbix/zabbix_agentd.conf
+  sed -i "s/ServerActive=127.0.0.1/ServerActive=$1/" /etc/zabbix/zabbix_agentd.conf
+  sed -i "s/# HostMetadata=/HostMetadata=$2/" /etc/zabbix/zabbix_agentd.conf
 
 
   # Start Zabbix Agent
