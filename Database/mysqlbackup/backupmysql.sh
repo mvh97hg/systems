@@ -79,10 +79,20 @@ for KEY in "${!DBHOST[@]}"; do
         DATE=$(date +'%Y_%m_%d-%H_%M_%S')
         echo -n "Backing up database $database..."
         test ${DBHOST[$KEY]} = "localhost" && SERVER=`hostname -f` || SERVER=${DBHOST[$KEY]}
-        mysqldump --host ${DBHOST[$KEY]} --port ${DBPORT[$KEY]} --user=${DBUSER[$KEY]} --password=${DBPASS[$KEY]} \
-        ${DBOPTIONS[$KEY]} $database $TABLES > $BACKDIR/$SERVER-$database-$DATE.sql
-        $COMPRESSION_COMMAND $BACKDIR/$SERVER-$database-$DATE.sql
-        echo "done!"
+        {
+            mysqldump --host ${DBHOST[$KEY]} --port ${DBPORT[$KEY]} --user=${DBUSER[$KEY]} --password=${DBPASS[$KEY]} \
+                ${DBOPTIONS[$KEY]} $database $TABLES > $BACKDIR/$SERVER-$database-$DATE.sql
+
+            if [ $? -eq 0 ]; then
+                echo "Backup for database $database completed successfully at $(date)"
+                
+                $COMPRESSION_COMMAND $BACKDIR/$SERVER-$database-$DATE.sql
+            else
+                echo "Backup for database $database failed at $(date)"
+            fi
+            #$COMPRESSION_COMMAND $BACKDIR/$SERVER-$database-$DATE.sql
+            echo "done!"
+        } >> $LOGFILE 2>&1
     done
 done
 
