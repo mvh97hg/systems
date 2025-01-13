@@ -6,17 +6,6 @@
 # 
 
 #----------------------Start of Script------------------#
-current_timezone=$(timedatectl | grep "Time zone" | awk '{print $3}')
-if [ "$current_timezone" != "$TZ" ]; then
-    echo "Current timezone is $current_timezone. Changing timezone to $TZ..."
-    #Change timezone
-    sudo timedatectl set-timezone $TZ
-    sudo timedatectl set-local-rtc 1
-    echo "Timezone has been changed to $TZ."
-else
-    echo "Timezone is already $TZ, no need to change."
-fi
-
 install_sshpass() {
     if ! command -v sshpass &> /dev/null; then
         echo "sshpass not installed. Installing..."
@@ -87,6 +76,7 @@ for KEY in "${!DBHOST[@]}"; do
     fi
 
     for database in $DBS; do
+        DATE=$(date +'%Y_%m_%d-%H_%M_%S')
         echo -n "Backing up database $database..."
         test ${DBHOST[$KEY]} = "localhost" && SERVER=`hostname -f` || SERVER=${DBHOST[$KEY]}
         mysqldump --host ${DBHOST[$KEY]} --port ${DBPORT[$KEY]} --user=${DBUSER[$KEY]} --password=${DBPASS[$KEY]} \
@@ -102,8 +92,8 @@ done
 
 if  [ $MAIL = "y" ]; then
     BODY="Your backup is ready! Find more useful scripts and info at http://www.ameir.net. \n\n"
-    BODY=$BODY`cd $BACKDIR; for file in *$DATE.sql.$COMPRESSION_EXTENSION; do md5sum ${file};  done`
-    ATTACH=`for file in $BACKDIR/*$DATE.sql.$COMPRESSION_EXTENSION; do echo -n "-a ${file} ";  done`
+    BODY=$BODY`cd $BACKDIR; for file in *.sql.$COMPRESSION_EXTENSION; do md5sum ${file};  done`
+    ATTACH=`for file in $BACKDIR/*.sql.$COMPRESSION_EXTENSION; do echo -n "-a ${file} ";  done`
 
     echo -e "$BODY" | mutt -s "$SUBJECT" $ATTACH -- $EMAILS
     if [[ $? -ne 0 ]]; then
