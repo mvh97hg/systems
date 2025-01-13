@@ -47,7 +47,7 @@ BACKDIR="$DIR/$(date +'%Y')-$(date +'%m')-$(date +'%d')"
 # check of the backup directory exists
 # if not, create it
 if  [ ! -d $BACKDIR ]; then
-    echo -n "Creating $BACKDIR..."
+    echo "Creating $BACKDIR..."
     mkdir -p $BACKDIR
     echo "done!"
 fi
@@ -56,7 +56,7 @@ for KEY in "${!DBHOST[@]}"; do
     echo "Backing up MySQL database on ${DBHOST[$KEY]}..."
 
     if [ -z "${DBNAMES[$KEY]}" ]; then
-        echo -n "Creating list of all your databases..."
+        echo "Creating list of all your databases..."
         DBS=`mysql -h ${DBHOST[$KEY]} --user=${DBUSER[$KEY]} --password=${DBPASS[$KEY]} -Bse "show databases;"`
         echo "done!"
     else
@@ -77,18 +77,18 @@ for KEY in "${!DBHOST[@]}"; do
 
     for database in $DBS; do
         DATE=$(date +'%Y_%m_%d-%H_%M_%S')
-        echo -n "Backing up database $database..."
+        
         test ${DBHOST[$KEY]} = "localhost" && SERVER=`hostname -f` || SERVER=${DBHOST[$KEY]}
         {
+            echo "$(date +'%F %T'): Backing up database $database..."
             mysqldump --host ${DBHOST[$KEY]} --port ${DBPORT[$KEY]} --user=${DBUSER[$KEY]} --password=${DBPASS[$KEY]} \
                 ${DBOPTIONS[$KEY]} $database $TABLES > $BACKDIR/$SERVER-$database-$DATE.sql
 
             if [ $? -eq 0 ]; then
-                echo "Backup for database $database completed successfully at $(date)"
-                
                 $COMPRESSION_COMMAND $BACKDIR/$SERVER-$database-$DATE.sql
+                echo "$(date +'%F %T'): Backup for database $database completed successfully"
             else
-                echo "Backup for database $database failed at $(date)"
+                echo "$(date +'%F %T'): Backup for database $database failed"
             fi
             #$COMPRESSION_COMMAND $BACKDIR/$SERVER-$database-$DATE.sql
             echo "done!"
@@ -103,7 +103,7 @@ done
 if  [ $MAIL = "y" ]; then
     BODY="Your backup is ready! Find more useful scripts and info at http://www.ameir.net. \n\n"
     BODY=$BODY`cd $BACKDIR; for file in *.sql.$COMPRESSION_EXTENSION; do md5sum ${file};  done`
-    ATTACH=`for file in $BACKDIR/*.sql.$COMPRESSION_EXTENSION; do echo -n "-a ${file} ";  done`
+    ATTACH=`for file in $BACKDIR/*.sql.$COMPRESSION_EXTENSION; do echo "-a ${file} ";  done`
 
     echo -e "$BODY" | mutt -s "$SUBJECT" $ATTACH -- $EMAILS
     if [[ $? -ne 0 ]]; then
