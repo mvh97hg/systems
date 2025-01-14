@@ -4,7 +4,75 @@
 # fork from https://github.com/ameir.git
 # 
 # 
+SERVER=`hostname -f`
 
+# directory to backup to
+DIR=~/backups/mysql/
+LOGFILE="/var/log/backup_database.log"
+#----------------------MySQL Settings--------------------#
+
+DBNAMES[0]="db1 db2" # databases you want to backup, separated by a space; leave empty to backup all databases on this host
+DBUSER[0]="root"  # MySQL username
+DBPASS[0]="password"  # MySQL password
+DBHOST[0]="localhost"  # your MySQL server's location (IP address is best)
+DBPORT[0]="3306"  # MySQL port
+DBTABLES[0]="db1.table1 db1.table2 db2.table1" # tables you want to backup or exclude, separated by a space; leave empty to back up all tables
+DBTABLESMATCH[0]="include" # include will backup ONLY the tables in DBTABLES, exclude will backup all tables BUT those in DBTABLES
+DBOPTIONS[0]="--quick --single-transaction --skip-lock-tables --max-allowed-packet=64M"
+
+#----------------------Mail Settings--------------------#
+
+# set to 'y' if you'd like to be emailed the backup (requires mutt)
+MAIL=n
+
+# email addresses to send backups to, separated by a space
+EMAILS="address@yahoo.com address@usa.com"
+
+SUBJECT="MySQL backup on $SERVER ($DATE)"
+
+#----------------------Duplicity Settings--------------------#
+
+DUPLICITY=n
+DUPLICITY_OPTIONS="--no-encryption -v8 --s3-use-new-style"
+DUPLICITY_TARGET_URL="s3+http://my-backups/db/"
+
+#----------------------S3 Settings--------------------#
+
+S3_UPLOAD=n
+S3_PATH="my-backups/db/"
+S3_OPTIONS=""
+AWS_CLI_OPTIONS="--region us-east-1"
+
+#----------------------RSYNC Settings--------------------#
+RSYNC=n
+
+RSYNCHOST[0]="rsynchost"
+RSYNCUSER[0]="username"
+RSYNCPASS[0]="password"
+RSYNCDIR[0]="backups"
+RSYNCPORT[0]="22"
+
+#----------------------Telegram Settings--------------------#
+TELEGRAM=n
+
+BOTTOKEN="BOT_TOKEN"
+CHATID="CHAT_ID"
+
+#-------------------Deletion Settings-------------------#
+
+# delete old files?
+DELETE=n
+
+# how many days of backups do you want to keep?
+DAYS=30
+# how many months of backups do you want to keep? The backup of day 01 will be kept.
+MONTHS=3
+#-------------------Compression Settings-------------------#
+
+COMPRESSION_COMMAND="gzip -f"
+COMPRESSION_EXTENSION="gz"
+#----------------------End of Settings------------------#
+#########################################################
 #----------------------Start of Script------------------#
 install_sshpass() {
     if ! command -v sshpass &> /dev/null; then
@@ -66,10 +134,10 @@ for KEY in "${!DBHOST[@]}"; do
     # filter out the tables to backup
     if [ -n "${DBTABLES[$KEY]}" ]; then
         if  [ ${DBTABLESMATCH[$KEY]} = "exclude" ]; then
-        TABLES=''
-        for table in ${DBTABLES[$KEY]}; do
-            TABLES="$TABLES --ignore-table=$table "
-        done
+            TABLES=''
+            for table in ${DBTABLES[$KEY]}; do
+                TABLES="$TABLES --ignore-table=$table "
+            done
         else
         TABLES=${DBTABLES[$KEY]}
         fi
