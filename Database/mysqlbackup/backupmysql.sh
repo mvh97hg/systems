@@ -109,8 +109,8 @@ function die () {
     exit 1
 }
 
-CONFIG=${1:-`dirname $0`/backupmysql.conf}
-[ -f "$CONFIG" ] && . "$CONFIG" || die "Could not load configuration file ${CONFIG}!"
+#CONFIG=${1:-`dirname $0`/backupmysql.conf}
+#[ -f "$CONFIG" ] && . "$CONFIG" || die "Could not load configuration file ${CONFIG}!"
 BACKDIR="$DIR/$(date +'%Y')-$(date +'%m')-$(date +'%d')"
 # check of the backup directory exists
 # if not, create it
@@ -159,7 +159,7 @@ for KEY in "${!DBHOST[@]}"; do
                 echo "$(date +'%F %T'): Backup for database $database failed"
             fi
             #$COMPRESSION_COMMAND $BACKDIR/$SERVER-$database-$DATE.sql
-            echo "done!"
+            
         } >> $LOGFILE 2>&1
     done
 done
@@ -210,6 +210,11 @@ if  [ $RSYNC = "y" ]; then
     for KEY in "${!RSYNCHOST[@]}"; do
 
         sshpass -p "${RSYNCPASS[$KEY]}" rsync -auz --delete -e "ssh -p ${RSYNCPORT[$KEY]} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"  "${DIR}" "${RSYNCUSER[$KEY]}@${RSYNCHOST[$KEY]}:${RSYNCDIR[$KEY]}"
+        if [[ $? -ne 0 ]]; then
+            echo "$(date +'%F %T') ERROR: Sync fail to ${RSYNCHOST[$KEY]}:${RSYNCDIR[$KEY]} !"  >> $LOGFILE 2>&1
+        else
+            echo "$(date +'%F %T'): Sync complete to ${RSYNCHOST[$KEY]}:${RSYNCDIR[$KEY]} !"  >> $LOGFILE 2>&1
+        fi
     done
 fi
 
@@ -222,11 +227,11 @@ if  [ $TELEGRAM = "y" ]; then
     send_telegram_message "$MESSAGE"
 
     if [[ $? -ne 0 ]]; then
-        echo -e "\nERROR: Notification not sent to telegram! \n";
+        echo "$(date +'%F %T') ERROR: Notification not sent to telegram!"  >> $LOGFILE 2>&1
     else
-        echo -e "\nNotification has been sent to telegram! \n"
+        echo "$(date +'%F %T'): Notification has been sent to telegram!"  >> $LOGFILE 2>&1
     fi
     
 fi
 
-echo "Your backup is complete!"
+echo "$(date +'%F %T'): Backup is complete!" >> $LOGFILE 2>&1
