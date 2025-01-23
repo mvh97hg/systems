@@ -144,16 +144,16 @@ for KEY in "${!DBHOST[@]}"; do
     fi
 
     for database in $DBS; do
-        DATE=$(date +'%Y_%m_%d-%H_%M_%S')
-        
+        DATE=$(date +'%d%m%Y-%H%M%S')
+        FILENAME=$SERVER-$database-$DATE.sql
         test ${DBHOST[$KEY]} = "localhost" && SERVER=`hostname -f` || SERVER=${DBHOST[$KEY]}
         {
             echo "$(date +'%F %T'): Backing up database $database..."
             mysqldump --host ${DBHOST[$KEY]} --port ${DBPORT[$KEY]} --user=${DBUSER[$KEY]} --password=${DBPASS[$KEY]} \
-                ${DBOPTIONS[$KEY]} $database $TABLES > $BACKDIR/$SERVER-$database-$DATE.sql
+                ${DBOPTIONS[$KEY]} $database $TABLES > $BACKDIR/$FILENAME
 
             if [ $? -eq 0 ]; then
-                $COMPRESSION_COMMAND $BACKDIR/$SERVER-$database-$DATE.sql
+                $COMPRESSION_COMMAND $BACKDIR/$FILENAME
                 echo "$(date +'%F %T'): Backup for database $database completed successfully"
             else
                 echo "$(date +'%F %T'): Backup for database $database failed"
@@ -220,9 +220,8 @@ fi
 
 if  [ $TELEGRAM = "y" ]; then
     MESSAGE="<b>Database backup finished [$(date +'%d/%m/%Y %T')].</b>"
-    BACKUPS=$(find $BACKDIR -type f)
-    FORMATTED_BACKUPS=$(echo "$BACKUPS" |  echo -e "\n<code>$(xargs -I {} basename {})</code>")
-    MESSAGE+="$(echo -e "$FORMATTED_BACKUPS")"
+    BACKUPS=$(du -sh * |awk '{print "- " $2 " "$1}')
+    MESSAGE+=$(echo -e "\n<code>$BACKUPS</code>")
     MESSAGE+="$(echo -e "\n")"
     send_telegram_message "$MESSAGE"
 
