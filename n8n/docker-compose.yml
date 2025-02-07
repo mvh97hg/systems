@@ -22,6 +22,9 @@ services:
       - traefik_data:/letsencrypt
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /etc/localtime:/etc/localtime:ro
+    logging:
+      options:
+        max-size: "50m"
   n8n:
     image: docker.n8n.io/n8nio/n8n
     container_name: n8n
@@ -52,6 +55,9 @@ services:
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
     volumes:
       - n8n_data:/home/node/.n8n
+    logging:
+      options:
+        max-size: "50m"
 volumes:
   traefik_data:
     name: traefik_data
