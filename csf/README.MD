@@ -28,3 +28,21 @@
     TCP_OUT = "1:65535"
     UDP_OUT = "1:65535"
     ```
+### Cấu hình cho docker
+
+`/etc/docker/daemon.json`
+```
+{
+"iptables": false
+}
+```
+Khởi động lại docker
+```
+systemctl restart docker
+```
+
+tạo cấp quyền thực thi cho file [/etc/csf/csfpost.sh](csfpost.sh)
+```
+chmod +x /etc/csf/csfpost.sh
+csf -ra
+```
