@@ -1,19 +1,22 @@
 ## CSF chặn request từ quốc gia với GeoIP Lite của MaxMind
+1. Cài csf và ipset
+    ```
+    apt-get update
+    apt-get install -y ipset libwww-perl liblwp-protocol-https-perl libgd-graph-perl
 
-1. Đăng ký tài khoản MaxMind 
-2. Tạo khoá cấp phép
-3. Mở file `/etc/csf/csf.conf`, tìm và cập nhật các cấu hình sau
+    mkdir -p csf && cd csf
+    curl -Ls https://download.configserver.com/csf.tgz | tar --strip-components 1 -xz
+    ./install.sh
+    ```
+2. Đăng ký tài khoản MaxMind 
+3. Tạo khoá cấp phép
+4. Mở file `/etc/csf/csf.conf`, tìm và cập nhật các cấu hình sau
     ```
     MM_LICENSE_KEY = "licensekey"
     CC_SRC = "1" # Sử dụng MaxMind databases
     LF_IPSET = "1" #bật ipset
     CC_ALLOW_FILTER = "VN" #Điền quốc gia cho phép truy cập. ngăn cách bằng dấu ','
 
-    ```
-4. Cài ipset
-    ```
-    apt install ipset -y
-    apt-get install -y libwww-perl liblwp-protocol-https-perl libgd-graph-perl
     ```
 5. Restart csf và kiểm tra kết quả
     ```
