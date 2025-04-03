@@ -7,15 +7,15 @@ readarray -t IPv4 <<< $((/sbin/ip -4 -o addr show scope global | awk '{gsub(/\/.
 install_3proxy() {
     echo "Installing 3proxy"
 	if cat /etc/os-release | grep PRETTY_NAME | grep "CentOS Linux"; then
-		curl -O https://github.com/3proxy/3proxy/releases/download/0.9.5/3proxy-0.9.5.x86_64.rpm > /dev/null 2>&1
+		curl -LO https://github.com/3proxy/3proxy/releases/download/0.9.5/3proxy-0.9.5.x86_64.rpm > /dev/null 2>&1
 		rpm -ivh 3proxy-0.9.5.x86_64.rpm > /dev/null 2>&1
 		rm -rf 3proxy-0.9.5.x86_64.rpm
 	elif cat /etc/os-release | grep PRETTY_NAME | grep "Ubuntu"; then
-		curl -O https://github.com/3proxy/3proxy/releases/download/0.9.5/3proxy-0.9.5.x86_64.deb > /dev/null 2>&1
+		curl -LO https://github.com/3proxy/3proxy/releases/download/0.9.5/3proxy-0.9.5.x86_64.deb > /dev/null 2>&1
 		dpkg -i 3proxy-0.9.5.x86_64.deb > /dev/null 2>&1
 		rm -rf 3proxy-0.9.5.x86_64.deb
 	elif cat /etc/os-release | grep PRETTY_NAME | grep "Debian"; then
-		curl -O https://github.com/3proxy/3proxy/releases/download/0.9.5/3proxy-0.9.5.x86_64.deb > /dev/null 2>&1
+		curl -LO https://github.com/3proxy/3proxy/releases/download/0.9.5/3proxy-0.9.5.x86_64.deb > /dev/null 2>&1
 		dpkg -i 3proxy-0.9.5.x86_64.deb > /dev/null 2>&1
 		rm -rf 3proxy-0.9.5.x86_64.deb
 	else
