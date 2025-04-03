@@ -1,5 +1,7 @@
 #!/bin/bash
+used_ipv6=()
 
+readarray -t used_ipv6 <<< $((/sbin/ip -6 -o addr show scope global | awk '{gsub(/\/.*/,"",$4); print $4}') | sed 's/ /\n/g')
 # Hàm để tạo địa chỉ IPv6 ngẫu nhiên từ 0001 đến ffff
 generate_random_ipv6() {
   random_part=$(printf "%04x" $((RANDOM % 65536)))
@@ -8,7 +10,7 @@ generate_random_ipv6() {
 }
 
 # Mảng để lưu trữ các địa chỉ IPv6 đã được sử dụng
-used_ipv6=()
+
 
 # Tạo và ghi 1000 địa chỉ IPv6 vào tệp /etc/network/interfaces
 for ((i = 1; i <= 1000; i++)); do
