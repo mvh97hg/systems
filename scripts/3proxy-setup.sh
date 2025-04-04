@@ -60,8 +60,7 @@ EOF
 gen_3proxy_config() {
 
     cat <<EOF > /etc/3proxy/3proxy.cfg
-service
-#daemon
+
 maxconn 500
 nscache 65535
 nscache6 65535
@@ -86,12 +85,13 @@ users $/etc/3proxy/passwd
 #include /etc/3proxy/counters
 #include /etc/3proxy/bandlimiters
 
-authcache user 60
 auth strong cache
+authcache user,password 60
+
 deny * * 127.0.0.1
 
-include /etc/3proxy/proxy_http
-force
+include /etc/3proxy/proxy_config
+noforce
 EOF
 }
 
@@ -113,10 +113,6 @@ declare -a ports=()
 declare -a config=()
 
 gen_proxy() {
-
-	> $proxy_file
-    > $data
-
 	proxy=""
 	for ip in ${IPv4[@]}; do
 		username=$(tr -dc a-z </dev/urandom | head -c 8)
@@ -127,18 +123,21 @@ gen_proxy() {
 		port=$(generate_unique_port)
 
 		config+="allow $username\n"
-		config+="proxy -n -a -p${port} -i${ip} -e${ip}\n"
+		config+="auto -n -a -p${port} -i${ip} -e${ip}\n"
 		config+="flush\n\n"
 
 		proxy+="${ip}:${port}:${username}:${password}\n"
 
 		((port++))
     done
-	echo -e $config > /etc/3proxy/proxy_http
-	echo -e $proxy > /root/proxy.txt
+	echo -e $config > $config_file
+	echo -e $proxy > $proxy_file
 }
 
 echo "Install...."
+
+config_file="/etc/3proxy/proxy_config"
+proxy_file="/root/proxy.txt"
 install_3proxy > /dev/null 2>&1
 
 systemctl restart 3proxy > /dev/null 2>&1
