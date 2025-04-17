@@ -77,13 +77,10 @@ setuid 65535
 #logformat "- +_G%d-%m-%Y %H:%M:%S %E %U %N %I %O %C %T DIRECT/%R"
 #rotate 30
 
-#limit 100 Mbps
-#bandlimin 100000000
-#bandlimout 100000000
+include /etc/3proxy/counters
+include /etc/3proxy/bandlimiters
 
 users $/etc/3proxy/passwd
-#include /etc/3proxy/counters
-#include /etc/3proxy/bandlimiters
 
 auth strong cache
 authcache user,password 60
