@@ -1,7 +1,6 @@
 PermitRootLogin no
-Match Address 103.126.161.220,123.30.108.100,123.30.136.124,123.30.108.100
+Match Address 192.168.1.1
         PasswordAuthentication yes
         X11Forwarding no
         PermitRootLogin yes
-        RSAAuthentication yes
         PubkeyAuthentication yes
