@@ -99,3 +99,13 @@ Quản lý user, group
 >1.	ssh: tạo kết nối Secure Shell Protocol để điều khiển hệ điều hành Linux, Unix từ xa
 >2.	wget: tải file trên internet
 >3.	curl: tạo yêu cầu HTTP
+
+# Chặn sửa/xoá/đổi tên file/thư mục
+>1.	Chặn sửa đổi
+```
+sudo chattr +i test.txt
+```
+>2. Loại bỏ chặn
+```
+chattr -i test.txt
+```
