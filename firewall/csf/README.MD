@@ -46,3 +46,9 @@ tạo cấp quyền thực thi cho file [/etc/csf/csfpost.sh](csfpost.sh)
 chmod +x /etc/csf/csfpost.sh
 csf -ra
 ```
+
+
+```
+LF_CUSTOM1_LOG = "/var/log/asterisk/messages"
+
+```
