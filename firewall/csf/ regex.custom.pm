@@ -43,7 +43,7 @@ sub custom_line {
 # constructed regex's
 ###############################################################################
 # Do not edit beyond this point
-  # Asterisk PJSIP failed REGISTER
+  # Asterisk PJSIP REGISTER failed
   if (($globlogs{CUSTOM1_LOG}{$lgfile}) and ($line =~ /Request 'REGISTER'.*failed for '((?:\d{1,3}\.){3}\d{1,3})\:\d+'.*- Failed to authenticate/)) {
     return ("Asterisk REGISTER Failed from",$1,"asterisk-register","10","5060,5061","86400","0");
   }
