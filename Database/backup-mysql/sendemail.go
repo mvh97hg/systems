@@ -2,13 +2,14 @@ package main
 
 import (
 	"crypto/tls"
-	"fmt"
 
 	gomail "gopkg.in/gomail.v2"
 )
 
-func SendMail(cfg *Config, messages string) error {
-
+func SendMail(cfg *Config, messages string) {
+	if !cfg.Mail {
+		return
+	}
 	m := gomail.NewMessage()
 	m.SetHeader("From", cfg.SmtpUser)
 	m.SetHeader("To", cfg.Emails)
@@ -19,8 +20,7 @@ func SendMail(cfg *Config, messages string) error {
 	d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
 	if err := d.DialAndSend(m); err != nil {
 		logger.Printf("ERROR: Không thể gửi email: %v\n", err)
-		return fmt.Errorf("không thể gửi email: %v", err)
+
 	}
-	return nil
 
 }
