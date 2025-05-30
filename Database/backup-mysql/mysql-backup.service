@@ -1,0 +1,16 @@
+[Unit]
+Description=MySQL Backup Service
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/mysql-backup/mysql-backup.bin
+Restart=on-failure
+RestartSec=60
+WorkingDirectory=/usr/local/bin/mysql-backup
+User=backup
+#EnvironmentFile=-/etc/default/mysql-backup
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
