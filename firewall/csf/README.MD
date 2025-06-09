@@ -46,7 +46,12 @@ tạo cấp quyền thực thi cho file [/etc/csf/csfpost.sh](csfpost.sh)
 chmod +x /etc/csf/csfpost.sh
 csf -ra
 ```
+thêm rule cho docker network thay eth0 và network-bridge thành tên interface cần cấu hình
 
+```
+iptables -A FORWARD -i network-bridge -o eth0 -j ACCEPT
+iptables -A FORWARD -i eth0 -o network-bridge -m state --state ESTABLISHED,RELATED -j ACCEPT
+```
 
 ```
 LF_CUSTOM1_LOG = "/var/log/asterisk/messages"
