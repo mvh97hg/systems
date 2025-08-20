@@ -23,6 +23,8 @@ gtid_domain_id  = 101
 log_error = /var/log/mysql/error.log
 slow_query_log_file    = /var/log/mysql/mariadb-slow.log
 long_query_time    = 10
+# auto_increment_increment = 2
+# auto_increment_offset    = 1
 
 # --- InnoDB Settings ---
 innodb_buffer_pool_size = 10G
