@@ -72,7 +72,16 @@ expire_logs_days = 15
 [mariadb-10.11]
 
 ```
+## Tạo user replica và admin ở master
 
+```
+CREATE USER 'replica'@'%' IDENTIFIED BY 'Passwrd@#';
+GRANT REPLICATION SLAVE ON *.* TO 'replica'@'%';
+
+CREATE USER 'admin'@'%' IDENTIFIED BY 'Passwrd@#';
+GRANT ALL PRIVILEGES ON *.* TO 'admin'@'%' WITH GRANT OPTION;
+FLUSH PRIVILEGES;
+```
 ## Cấu hình Replica
 
 ```
@@ -86,3 +95,5 @@ CHANGE MASTER TO
 
 START SLAVE;
 ```
+
+
