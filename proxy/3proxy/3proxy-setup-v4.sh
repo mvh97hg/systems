@@ -28,6 +28,7 @@ install_3proxy() {
 	touch /etc/3proxy/proxy_http 
 	touch /etc/3proxy/counters 
 	touch /etc/3proxy/bandlimiters
+	touch /etc/3proxy/allow_ips
 	
 	script_adduser
 	gen_3proxy_config
@@ -82,11 +83,11 @@ include /etc/3proxy/bandlimiters
 
 users $/etc/3proxy/passwd
 
-auth strong cache
+auth iponly strong cache
 authcache user,password 60
 
 deny * * 127.0.0.1
-
+include /etc/3proxy/allow_ips
 include /etc/3proxy/proxy_config
 noforce
 EOF
