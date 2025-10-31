@@ -1,3 +1,7 @@
+## Cài đặt docker
+```
+curl -sSL https://raw.githubusercontent.com/mvh97hg/systems/refs/heads/main/docker/install.sh | bash -
+```
 ## Bảo mật máy chủ docker với firewalld
 
 Vô hiệu hóa iptables cho Docker
@@ -30,4 +34,5 @@ Ngoài ra, để cho phép các container docker truy cập vào các cổng má
 firewall-cmd --permanent --zone=trusted --add-interface=docker0
 firewall-cmd --reload
 systemctl restart docker
+
 ```
