@@ -1,0 +1,81 @@
+# ============================
+# Stage 1 — Build / Install FS
+# ============================
+ARG DEBIAN_VERSION=bookworm
+FROM debian:${DEBIAN_VERSION} AS builder
+
+ARG TOKEN
+# ARG FS_META_PACKAGE=freeswitch-meta-all
+ARG FS_META_PACKAGE=freeswitch-meta-vanilla
+RUN apt-get update -qq \
+    && apt-get install -y --no-install-recommends ca-certificates gnupg2 locales wget
+
+RUN localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+ENV LANG en_US.utf8
+
+RUN wget --no-verbose --http-user=signalwire --http-password=${TOKEN} \
+      -O /usr/share/keyrings/signalwire-freeswitch-repo.gpg \
+      https://freeswitch.signalwire.com/repo/deb/debian-release/signalwire-freeswitch-repo.gpg \
+    && echo "machine freeswitch.signalwire.com login signalwire password ${TOKEN}" > /etc/apt/auth.conf \
+    && echo "deb [signed-by=/usr/share/keyrings/signalwire-freeswitch-repo.gpg] https://freeswitch.signalwire.com/repo/deb/debian-release/ bookworm main" \
+         > /etc/apt/sources.list.d/freeswitch.list
+WORKDIR /freeswitch
+RUN apt-get update -qq \
+    && apt-get install -y ${FS_META_PACKAGE} 
+RUN mkdir -p /freeswitch \
+    && dpkg --root=/freeswitch -i /var/cache/apt/archives/*.deb || true \
+    && apt-get -f install -y || true
+
+
+# # ============================
+# # Stage 2 — Runtime
+# # ============================
+# FROM debian:${DEBIAN_VERSION} AS runtime
+
+# ARG FREESWITCH_UID=499
+# ARG FREESWITCH_GID=499
+
+# RUN groupadd -r freeswitch --gid=${FREESWITCH_GID} \
+#  && useradd -r -g freeswitch --uid=${FREESWITCH_UID} freeswitch
+
+# RUN apt-get update -qq \
+#     && apt-get install -y --no-install-recommends gosu ca-certificates locales \
+#     && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8 \
+#     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ENV LANG en_US.utf8
+
+# -------------------
+# Copy FreeSWITCH từ stage 1
+# -------------------
+# COPY --from=builder /usr/bin/freeswitch       /usr/bin/
+# COPY --from=builder /usr/bin/fs_cli           /usr/bin/
+
+# COPY --from=builder /usr/lib/freeswitch       /usr/lib/freeswitch
+# COPY --from=builder /usr/lib/x86_64-linux-gnu/libfreeswitch* /usr/lib/x86_64-linux-gnu/
+# COPY --from=builder /usr/share/freeswitch     /usr/share/freeswitch
+# COPY --from=builder /var/run/freeswitch /var/run/freeswitch
+# COPY --from=builder /var/lib/freeswitch        /var/lib/freeswitch
+# COPY --from=builder /etc/freeswitch           /etc/freeswitch
+
+# Entry, ports, volumes
+COPY docker-entrypoint.sh /
+COPY build/freeswitch.limits.conf /etc/security/limits.d/
+
+EXPOSE 8021/tcp \
+    5060/tcp 5060/udp 5080/tcp 5080/udp \
+    5061/tcp 5061/udp 5081/tcp 5081/udp \
+    5066/tcp \
+    7443/tcp \
+    8081/tcp 8082/tcp \
+    10000-65535/udp
+
+VOLUME ["/etc/freeswitch"]
+VOLUME ["/tmp"]
+
+SHELL ["/bin/bash", "-c"]
+HEALTHCHECK --interval=15s --timeout=5s \
+  CMD fs_cli -x status | grep -q ^UP || exit 1
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["freeswitch"]

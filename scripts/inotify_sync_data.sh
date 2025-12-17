@@ -1,65 +1,93 @@
 #!/bin/bash
-BASE_SOURCE="/sourcedir"
-BASE_DEST="/destdir"
-YEAR=$(date +%Y)
-MONTH=$(date +%m)
 
-SOURCE_DIR="${BASE_SOURCE}/${YEAR}/${MONTH}/"
-DEST_DIR="${BASE_DEST}/${YEAR}/${MONTH}/"
+# ==== CONFIGURATION ====
+SRCDIR[0]="/data/camera1"
+DSTDIR[0]="/mnt/backup1"
+RSYNC_OPTS[0]="-urz --delete"
+SYNC_INTERVAL[0]=30
+RSYNC_TIMEOUT[0]=120
 
-SYNC_INTERVAL=0
-LAST_SYNC_TIME=0
-SYNC_IN_PROGRESS=0
-RSYNC_TIMEOUT=120
+SRCDIR[1]="/data/camera2"
+DSTDIR[1]="root@192.168.1.2:/mnt/backup2"
+RSYNC_OPTS[1]="-urz --remove-source-files"
+SYNC_INTERVAL[1]=60
+RSYNC_TIMEOUT[1]=300
 
-INOTIFY_PID=0
+# ==== SCRIPT START ====
+
+declare -a LAST_SYNC
+declare -a SYNC_IN_PROGRESS
+declare -a INOTIFY_PID
 
 log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
 }
 
 cleanup() {
-    log "Receive stop signal (Ctrl+C), end script..."
-    if [ $INOTIFY_PID -ne 0 ]; then
-        kill $INOTIFY_PID 2>/dev/null
-        wait $INOTIFY_PID 2>/dev/null
+  log "Stopping script..."
+  for pid in "${INOTIFY_PID[@]}"; do
+    if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+      kill "$pid" 2>/dev/null
+      wait "$pid" 2>/dev/null
     fi
-    exit 0
+  done
+  exit 0
 }
 
 trap cleanup SIGINT SIGTERM
 
-sync_data() {
-    if [ $SYNC_IN_PROGRESS -eq 1 ]; then
-        log "Sync đang chạy..."
-        return
-    fi
+sync_pair() {
+  local i=$1
 
-    NOW=$(date +%s)
-    if [ $((NOW - LAST_SYNC_TIME)) -lt $SYNC_INTERVAL ]; then
-        log "Sync too close, wait another $((SYNC_INTERVAL - (NOW - LAST_SYNC_TIME))) seconds."
-        return
-    fi
+  if [ "${SYNC_IN_PROGRESS[$i]}" = "1" ]; then
+    log "[$i] Sync already running, skipping."
+    return
+  fi
 
-    SYNC_IN_PROGRESS=1
-    log "Start sync..."
-    timeout "$RSYNC_TIMEOUT" rsync -urz "$SOURCE_DIR" "$DEST_DIR"
-    if [ $? -eq 0 ]; then
-        log "Sync successful."
-        LAST_SYNC_TIME=$(date +%s)
-    else
-        log "Sync failed. $?"
-    fi
-    SYNC_IN_PROGRESS=0
-    #log "End..."
+  local now=$(date +%s)
+  local last=${LAST_SYNC[$i]:-0}
+  local interval=${SYNC_INTERVAL[$i]}
+  local wait=$((interval - (now - last)))
+
+  if [ "$wait" -gt 0 ]; then
+    log "[$i] Sync too soon, wait $wait more seconds."
+    return
+  fi
+
+  SYNC_IN_PROGRESS[$i]=1
+
+  local src="${SRCDIR[$i]}"
+  local dst="${DSTDIR[$i]}"
+  local opts="${RSYNC_OPTS[$i]}"
+  local timeout_val="${RSYNC_TIMEOUT[$i]}"
+
+  log "[$i] Syncing: $src → $dst"
+  timeout "$timeout_val" rsync $opts "$src/" "$dst/"
+
+  if [ $? -eq 0 ]; then
+    log "[$i] Sync successful"
+    LAST_SYNC[$i]="$now"
+  else
+    log "[$i] Sync failed"
+  fi
+
+  SYNC_IN_PROGRESS[$i]=0
 }
 
-(
-    inotifywait -m -r -e create,modify "$SOURCE_DIR" --format '%w%f'
-) | while read FILE; do
-    log "Change detection: $FILE"
-    sync_data
-done &
+# Start inotifywait for each SRCDIR
+for i in "${!SRCDIR[@]}"; do
+  src="${SRCDIR[$i]}"
+  log "[$i] Watching $src"
+  (
+    inotifywait -m -r -e create,modify "$src" --format '%w%f' 2>/dev/null
+  ) | while read file; do
+    log "[$i] Change detected: $file"
+    sync_pair "$i"
+  done &
+  INOTIFY_PID[$i]=$!
+done
 
-INOTIFY_PID=$!
-wait $INOTIFY_PID
+# Wait for all background inotify processes
+for pid in "${INOTIFY_PID[@]}"; do
+  wait "$pid"
+done
