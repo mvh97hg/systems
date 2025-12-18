@@ -1,8 +1,8 @@
 services:
   traefik:
     image: "traefik"
-    container_name: traefik
-    restart: always
+    container_name: n8n_traefik
+    restart: unless-stopped
     command:
       - "--api=true"
       - "--api.insecure=true"
@@ -26,14 +26,14 @@ services:
       options:
         max-size: "50m"
   n8n:
-    image: docker.n8n.io/n8nio/n8n
-    container_name: n8n
-    restart: always
-    ports:
-      - "127.0.0.1:5678:5678"
+    image: docker.n8n.io/n8nio/n8n:${N8N_VERSION}
+    container_name: n8n_n8n
+    restart: unless-stopped
+    # ports:
+    #   - "127.0.0.1:5678:5678"
     labels:
       - traefik.enable=true
-      - traefik.http.routers.n8n.rule=Host(`${DOMAIN_NAME}`)
+      - traefik.http.routers.n8n.rule=Host(`${N8N_DOMAIN}`)
       - traefik.http.routers.n8n.tls=true
       - traefik.http.routers.n8n.entrypoints=web,websecure
       - traefik.http.routers.n8n.tls.certresolver=mytlschallenge
@@ -42,22 +42,64 @@ services:
       - traefik.http.middlewares.n8n.headers.browserXSSFilter=true
       - traefik.http.middlewares.n8n.headers.contentTypeNosniff=true
       - traefik.http.middlewares.n8n.headers.forceSTSHeader=true
-      - traefik.http.middlewares.n8n.headers.SSLHost=${DOMAIN_NAME}
+      - traefik.http.middlewares.n8n.headers.SSLHost=${N8N_DOMAIN}
       - traefik.http.middlewares.n8n.headers.STSIncludeSubdomains=true
       - traefik.http.middlewares.n8n.headers.STSPreload=true
-      - traefik.http.routers.n8n.middlewares=n8n@docker
+      - traefik.http.middlewares.rl.ratelimit.average=50
+      - traefik.http.middlewares.rl.ratelimit.burst=100
+      - traefik.http.routers.n8n.tls.certresolver=le
+      - traefik.http.routers.n8n.middlewares=n8n@docker,rl@docker
+      - com.centurylinklabs.watchtower.enable=true
+
     environment:
-      - N8N_HOST=${DOMAIN_NAME}
+      - N8N_HOST=${N8N_DOMAIN}
       - N8N_PORT=5678
       - N8N_PROTOCOL=https
       - NODE_ENV=production
-      - WEBHOOK_URL=https://${DOMAIN_NAME}/
-      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+      - WEBHOOK_URL=https://${N8N_DOMAIN}/
+      - GENERIC_TIMEZONE=${TIMEZONE}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+      - DB_POSTGRESDB_USER=${POSTGRES_USER}
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      - N8N_SECURE_COOKIE=true
+
     volumes:
       - n8n_data:/home/node/.n8n
+    depends_on:
+      - postgres
     logging:
       options:
         max-size: "50m"
+  postgres:
+    image: postgres:15
+    container_name: n8n_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    logging:
+      options:
+        max-size: "50m"
+
+  watchtower:
+    image: containrrr/watchtower
+    container_name: n8n_watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: >
+      --label-enable
+      --cleanup
+      --schedule "${WATCHTOWER_SCHEDULE}"
+    logging:
+      options:
+        max-size: "50m"
+
 volumes:
   traefik_data:
     name: traefik_data
@@ -65,11 +107,12 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: ./traefik_data
+      device: ${PWD}/data/traefik
   n8n_data:
     name: n8n_data
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: ./n8n_data
+      device: ${PWD}/data/n8n
+  postgres:
