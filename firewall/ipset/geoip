@@ -1,0 +1,632 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SRC_V4="https://www.ipdeny.com/ipblocks/data/countries"
+SRC_V6="https://www.ipdeny.com/ipv6/ipaddresses/blocks"
+
+DIR="/etc/firewalld/ipsets"
+
+ALLOW4="$DIR/allow_cc.xml"
+DENY4="$DIR/deny_cc.xml"
+
+ALLOW6="$DIR/allow_cc6.xml"
+DENY6="$DIR/deny_cc6.xml"
+
+PARALLEL=8
+UPDATED=0
+DEBUG="${DEBUG:-0}"
+
+########################################
+
+debug() {
+ [ "$DEBUG" = "1" ] && echo "[DEBUG] $*" >&2 || true
+}
+
+log() {
+ echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
+}
+
+normalize_cc() {
+ printf "%s\n" "$@" | tr '[:upper:]' '[:lower:]' | sort -u
+}
+
+########################################
+
+get_cc_list() {
+ FILE="$1"
+ [ -f "$FILE" ] || return
+
+ grep -oP '(?<=geoip:)[a-z]{2}' "$FILE" || true
+}
+
+########################################
+
+download_and_append_entries() {
+
+cc="$1"
+src="$2"
+ipver="$3"
+outfile="$4"
+is_append="${5:-0}"  # 1 = append to existing file, 0 = overwrite
+
+log "  Downloading entries for $cc (IPv$ipver)..."
+
+ZONE_URL="$src/$cc.zone"
+debug "URL: $ZONE_URL"
+
+RESPONSE=$(curl -fsSL -w "\n%{http_code}" "$ZONE_URL" 2>&1 || echo "CURL_ERROR")
+HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+BODY=$(echo "$RESPONSE" | head -n -1)
+
+debug "HTTP Code: $HTTP_CODE"
+debug "Response length: ${#BODY}"
+
+# Check HTTP status
+if [ "$HTTP_CODE" != "200" ]; then
+ log "  ERROR: Failed to download $cc (HTTP $HTTP_CODE)"
+ debug "Response: $BODY"
+ return 1
+fi
+
+# Check if response is empty
+if [ -z "$BODY" ]; then
+ log "  WARNING: Empty response for $cc"
+ return 1
+fi
+
+# Only write header if not appending
+if [ "$is_append" = "0" ]; then
+ echo "  <!-- geoip:$cc -->" > "$outfile"
+else
+ echo "  <!-- geoip:$cc -->" >> "$outfile"
+fi
+
+# Process and append entries
+COUNT_ADDED=0
+echo "$BODY" \
+| tr -d '\r' \
+| sort -u \
+| while read -r net
+do
+ [ -z "$net" ] && continue
+
+ if [ "$ipver" = "4" ]; then
+   if [[ "$net" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$ ]]; then
+     echo "  <entry>$net</entry>" >> "$outfile"
+     ((COUNT_ADDED++)) || true
+   else
+     debug "  Skipped IPv4 (invalid): $net"
+   fi
+ else
+   if [[ "$net" == *:* ]]; then
+     echo "  <entry>$net</entry>" >> "$outfile"
+     ((COUNT_ADDED++)) || true
+   else
+     debug "  Skipped IPv6 (invalid): $net"
+   fi
+ fi
+done
+
+TOTAL_ENTRIES=$(grep -c "<entry>" "$outfile" || echo "0")
+log "  Entries added: $TOTAL_ENTRIES for $cc"
+
+if [ "$TOTAL_ENTRIES" -eq 0 ]; then
+ log "  WARNING: No valid entries added for $cc"
+ return 1
+fi
+
+echo >> "$outfile"
+return 0
+
+}
+
+########################################
+
+append_to_xml() {
+
+FILE="$1"
+CC="$2"
+SRC="$3"
+IPVER="$4"
+
+# Temporary file for new entries
+TMP=$(mktemp)
+
+# Download entries (without XML wrapper)
+download_and_append_entries "$CC" "$SRC" "$IPVER" "$TMP" "0"
+
+if [ ! -s "$TMP" ]; then
+ rm "$TMP"
+ return 1
+fi
+
+# Remove closing </ipset> from main file
+sed -i '/<\/ipset>/d' "$FILE"
+
+# Append new entries
+cat "$TMP" >> "$FILE"
+
+# Re-add closing tag
+echo '</ipset>' >> "$FILE"
+
+rm "$TMP"
+UPDATED=1
+
+return 0
+
+}
+
+########################################
+
+download_block() {
+
+cc="$1"
+src="$2"
+ipver="$3"
+outfile="$4"
+
+log "  Downloading $cc (IPv$ipver)..."
+
+echo "  <!-- geoip:$cc -->" > "$outfile"
+
+# Try to download zone file
+ZONE_URL="$src/$cc.zone"
+debug "URL: $ZONE_URL"
+
+RESPONSE=$(curl -fsSL -w "\n%{http_code}" "$ZONE_URL" 2>&1 || echo "CURL_ERROR")
+HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+BODY=$(echo "$RESPONSE" | head -n -1)
+
+debug "HTTP Code: $HTTP_CODE"
+debug "Response length: ${#BODY}"
+
+# Check HTTP status
+if [ "$HTTP_CODE" != "200" ]; then
+ log "  ERROR: Failed to download $cc (HTTP $HTTP_CODE)"
+ debug "Response: $BODY"
+ echo "  <!-- ERROR: HTTP $HTTP_CODE -->" >> "$outfile"
+ return 1
+fi
+
+# Check if response is empty
+if [ -z "$BODY" ]; then
+ log "  WARNING: Empty response for $cc"
+ echo "  <!-- WARNING: Empty response -->" >> "$outfile"
+ return 1
+fi
+
+# Count entries before filtering
+COUNT_BEFORE=$(echo "$BODY" | wc -l)
+debug "Lines before filtering: $COUNT_BEFORE"
+
+# Process entries
+COUNT_ADDED=0
+echo "$BODY" \
+| tr -d '\r' \
+| sort -u \
+| while read -r net
+do
+ [ -z "$net" ] && continue
+
+ if [ "$ipver" = "4" ]; then
+   # IPv4: must be x.x.x.x/xx format
+   if [[ "$net" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+$ ]]; then
+     echo "  <entry>$net</entry>" >> "$outfile"
+     ((COUNT_ADDED++)) || true
+   else
+     debug "  Skipped IPv4 (invalid): $net"
+   fi
+ else
+   # IPv6: must contain colon
+   if [[ "$net" == *:* ]]; then
+     echo "  <entry>$net</entry>" >> "$outfile"
+     ((COUNT_ADDED++)) || true
+   else
+     debug "  Skipped IPv6 (invalid): $net"
+   fi
+ fi
+done
+
+TOTAL_ENTRIES=$(grep -c "<entry>" "$outfile" || echo "0")
+log "  Entries added: $TOTAL_ENTRIES for $cc"
+
+if [ "$TOTAL_ENTRIES" -eq 0 ]; then
+ log "  WARNING: No valid entries added for $cc"
+ return 1
+fi
+
+echo >> "$outfile"
+return 0
+
+}
+
+########################################
+
+generate_xml() {
+
+FILE="$1"
+SRC="$2"
+IPVER="$3"
+shift 3
+
+CC_LIST=($(normalize_cc "$@"))
+
+log "Generating $FILE with ${#CC_LIST[@]} countries"
+
+TMP=$(mktemp)
+WORK=$(mktemp -d)
+
+trap "rm -rf '$WORK'" EXIT
+
+export SRC IPVER DEBUG
+export -f download_block debug log
+
+# Sequential execution to see progress
+for cc in "${CC_LIST[@]}"; do
+ download_block "$cc" "$SRC" "$IPVER" "$WORK/$cc" || {
+   log "  Failed to download $cc, continuing..."
+   echo '<ipset type="hash:net">' > "$WORK/$cc"
+   echo '<option name="maxelem" value="2000000"/>' >> "$WORK/$cc"
+   echo '<option name="hashsize" value="262144"/>' >> "$WORK/$cc"
+   echo '  <!-- geoip:'$cc' ERROR -->' >> "$WORK/$cc"
+   echo '</ipset>' >> "$WORK/$cc"
+ }
+done
+
+log "Building XML file..."
+
+echo '<ipset type="hash:net">' > "$TMP"
+echo '<option name="maxelem" value="2000000"/>' >> "$TMP"
+echo '<option name="hashsize" value="262144"/>' >> "$TMP"
+echo >> "$TMP"
+
+TOTAL_ENTRIES=0
+for cc in "${CC_LIST[@]}"; do
+ if [ -f "$WORK/$cc" ]; then
+   ENTRIES=$(grep -c "<entry>" "$WORK/$cc" || echo "0")
+   TOTAL_ENTRIES=$((TOTAL_ENTRIES + ENTRIES))
+   debug "Added $ENTRIES entries from $cc"
+   cat "$WORK/$cc" >> "$TMP"
+ fi
+done
+
+echo '</ipset>' >> "$TMP"
+
+log "Total entries in file: $TOTAL_ENTRIES"
+
+if [ -f "$FILE" ] && cmp -s "$TMP" "$FILE" 2>/dev/null; then
+ log "File $FILE unchanged"
+ rm "$TMP"
+ return
+fi
+
+[ -f "$FILE" ] && cp "$FILE" "$FILE.old" && log "Backed up to $FILE.old"
+
+mv "$TMP" "$FILE"
+chmod 644 "$FILE"
+
+log "Wrote $FILE"
+UPDATED=1
+}
+
+########################################
+
+remove_cc_block() {
+
+FILE="$1"
+CC="$2"
+
+[ -f "$FILE" ] || return
+
+TMP=$(mktemp)
+
+awk -v cc="$CC" '
+
+# Always print opening/closing ipset tags and options
+/<ipset|<\/ipset|<option/ {
+  print
+  next
+}
+
+# Handle geoip country comments
+/<!-- geoip:/ {
+  if ($0 ~ "geoip:"cc) {
+    skip = 1
+    next
+  }
+  skip = 0
+}
+
+# Print other lines only if not in skip mode
+!skip
+
+' "$FILE" > "$TMP"
+
+mv "$TMP" "$FILE"
+
+UPDATED=1
+}
+
+########################################
+
+reload_fw() {
+
+if [ "$UPDATED" = "1" ]; then
+ if command -v firewall-cmd &>/dev/null; then
+   log "Reloading firewalld..."
+   firewall-cmd --reload && log "firewalld reloaded" || log "ERROR: Failed to reload firewalld"
+ else
+   log "WARNING: firewall-cmd not found, skipping reload"
+ fi
+else
+ log "No changes made"
+fi
+
+}
+
+ipv6_enabled() {
+    # Check if IPv6 is supported
+    [ -f /proc/net/if_inet6 ] || return 1
+    
+    # Filter out loopback (::1) and link-local (fe80::/10)
+    # Returns true if there are any real IPv6 addresses
+    while IFS= read -r line; do
+        # Format: device index prefix_len scope_id flags if_name
+        # Example: 20010db8000000000000000000000001 40 80 00 00000000 eth0
+        addr=$(echo "$line" | awk '{print $1}')
+        scope=$(echo "$line" | awk '{print $4}')
+        iface=$(echo "$line" | awk '{print $6}')
+        
+        # Skip loopback (lo interface or scope 10)
+        [ "$iface" = "lo" ] && continue
+        [ "$scope" = "10" ] && continue
+        
+        # Skip link-local addresses (fe80::/10, scope 20)
+        if [[ "$addr" == fe80* ]]; then
+            [ "$scope" = "20" ] && continue
+        fi
+        
+        # Skip addresses without real scope (scope 00)
+        [ "$scope" = "00" ] && continue
+        
+        # Found a real IPv6 address
+        debug "Found real IPv6: $addr (scope: $scope, iface: $iface)"
+        return 0
+    done < /proc/net/if_inet6
+    
+    debug "No real IPv6 address found"
+    return 1
+}
+
+########################################
+
+build_sets() {
+
+TYPE="$1"
+shift
+
+CC=$(normalize_cc "$@")
+
+if [ "$TYPE" = "allow" ]; then
+ generate_xml "$ALLOW4" "$SRC_V4" 4 $CC
+
+ if ipv6_enabled; then
+   generate_xml "$ALLOW6" "$SRC_V6" 6 $CC
+ fi
+
+else
+ generate_xml "$DENY4" "$SRC_V4" 4 $CC
+
+ if ipv6_enabled; then
+   generate_xml "$DENY6" "$SRC_V6" 6 $CC
+ fi
+
+fi
+
+reload_fw
+}
+
+########################################
+
+add_cc() {
+
+TYPE="$1"
+shift
+
+NEW=$(normalize_cc "$@")
+
+if [ "$TYPE" = "allow" ]; then
+ FILE4="$ALLOW4"
+ FILE6="$ALLOW6"
+ SRC="$SRC_V4"
+ SRC6="$SRC_V6"
+else
+ FILE4="$DENY4"
+ FILE6="$DENY6"
+ SRC="$SRC_V4"
+ SRC6="$SRC_V6"
+fi
+
+# Find countries NOT already in the file
+ONLY_NEW=""
+for cc in $NEW; do
+ if grep -q "geoip:$cc" "$FILE4" 2>/dev/null; then
+   log "  $cc already in $TYPE list (skipping)"
+ else
+   ONLY_NEW="$ONLY_NEW $cc"
+ fi
+done
+
+ONLY_NEW=$(echo "$ONLY_NEW" | tr -s ' ')
+
+if [ -z "$ONLY_NEW" ]; then
+ log "No new countries to add (all already exist)"
+ UPDATED=0
+ return
+fi
+
+log "Adding new countries to $TYPE list: $ONLY_NEW"
+
+# Append only new countries to IPv4 file
+for cc in $ONLY_NEW; do
+ append_to_xml "$FILE4" "$cc" "$SRC" 4 || {
+   log "  ERROR: Failed to append $cc to $FILE4"
+ }
+done
+
+# Do the same for IPv6 if enabled
+if ipv6_enabled; then
+ for cc in $ONLY_NEW; do
+   append_to_xml "$FILE6" "$cc" "$SRC6" 6 || {
+     log "  ERROR: Failed to append $cc to $FILE6"
+   }
+ done
+fi
+
+reload_fw
+}
+
+########################################
+
+remove_cc() {
+
+TYPE="$1"
+shift
+
+CC=$(normalize_cc "$@")
+
+for c in $CC; do
+ if [ "$TYPE" = "allow" ]; then
+  remove_cc_block "$ALLOW4" "$c"
+  remove_cc_block "$ALLOW6" "$c"
+ else
+  remove_cc_block "$DENY4" "$c"
+  remove_cc_block "$DENY6" "$c"
+ fi
+done
+
+reload_fw
+}
+
+########################################
+
+update_sets() {
+
+log "Refreshing all configured country lists..."
+
+ALLOW=$(get_cc_list "$ALLOW4")
+DENY=$(get_cc_list "$DENY4")
+
+# Regenerate IPv4 allow set
+if [ -n "$ALLOW" ]; then
+ log "Refreshing IPv4 allow set ($ALLOW)"
+ generate_xml "$ALLOW4" "$SRC_V4" 4 $ALLOW
+fi
+
+# Regenerate IPv4 deny set
+if [ -n "$DENY" ]; then
+ log "Refreshing IPv4 deny set ($DENY)"
+ generate_xml "$DENY4" "$SRC_V4" 4 $DENY
+fi
+
+# Regenerate IPv6 sets if enabled
+if ipv6_enabled; then
+ if [ -n "$ALLOW" ]; then
+   log "Refreshing IPv6 allow set ($ALLOW)"
+   generate_xml "$ALLOW6" "$SRC_V6" 6 $ALLOW
+ fi
+ if [ -n "$DENY" ]; then
+   log "Refreshing IPv6 deny set ($DENY)"
+   generate_xml "$DENY6" "$SRC_V6" 6 $DENY
+ fi
+fi
+
+reload_fw
+}
+
+########################################
+
+reset_sets() {
+
+TYPE="$1"
+
+if [ "$TYPE" = "allow" ]; then
+    FILES=("$ALLOW4" "$ALLOW6")
+else
+    FILES=("$DENY4" "$DENY6")
+fi
+
+for FILE in "${FILES[@]}"; do
+    TMP=$(mktemp)
+
+    echo '<ipset type="hash:net">' > "$TMP"
+    echo '  <option name="maxelem" value="2000000"/>' >> "$TMP"
+    echo '  <option name="hashsize" value="262144"/>' >> "$TMP"
+    echo '</ipset>' >> "$TMP"
+
+    [ -f "$FILE" ] && cp "$FILE" "$FILE.old"
+
+    mv "$TMP" "$FILE"
+done
+
+firewall-cmd --reload
+log "GeoIP $TYPE set reset"
+
+}
+
+########################################
+
+case "${1:-}" in
+
+allow)
+ shift
+ build_sets allow "$@"
+;;
+
+deny)
+ shift
+ build_sets deny "$@"
+;;
+
+add)
+ TYPE="$2"
+ shift 2
+ add_cc "$TYPE" "$@"
+;;
+
+remove)
+ TYPE="$2"
+ shift 2
+ remove_cc "$TYPE" "$@"
+;;
+
+update)
+ update_sets
+;;
+
+reset)
+ TYPE="$2"
+ reset_sets "$TYPE"
+;;
+
+*)
+echo "Usage:"
+echo
+echo "geoip allow VN US"
+echo "geoip deny CN RU"
+echo
+echo "geoip add allow SG"
+echo "geoip add deny KP"
+echo
+echo "geoip remove allow JP"
+echo "geoip remove deny RU"
+echo
+echo "geoip update"
+echo
+echo "geoip reset allow"
+echo "geoip reset deny"
+echo
+echo "Environment variables:"
+echo "  DEBUG=1    Enable debug output"
+;;
+esac
