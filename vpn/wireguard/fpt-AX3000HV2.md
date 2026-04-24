@@ -54,3 +54,11 @@ uci commit firewall
 /etc/init.d/firewall restart
 
 ```
+
+## Bật giao diện Openwrt
+
+```
+uci set uhttpd.main.active='1'
+uci commit uhttpd
+/etc/init.d/uhttpd restart
+```
