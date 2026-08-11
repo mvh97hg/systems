@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"fmt"
@@ -21,28 +21,40 @@ type Config struct {
 	DBTablesMatch  string
 	DBOptions      []string
 
-	BackupDir     string
 	LogFile       string
 	LogTimeFormat string
 
-	CompressionCmd string
-	CompressionExt string
+	MydumperCmd     string
+	MydumperThreads int
+	MydumperOptions []string
 
 	RemoveOld bool
 	Days      int
 	Months    int
 
+	// Storage configuration
+	LocalEnabled bool
+	LocalDir     string
+
+	NfsEnabled bool
+	NfsDir     string
+
+	S3Enabled        bool
+	S3Bucket         string
+	S3Region         string
+	S3Endpoint       string
+	S3AccessKey      string
+	S3SecretKey      string
+	S3ForcePathStyle bool
+
+	// Notification configuration
 	Telegram bool
 	BotToken string
 	ChatID   string
 
-	MaxConcurrentBackups int
-
 	Lark             bool
 	LarkUrl          string
 	LarkMessageTitle string
-
-	BackupFiles []string
 
 	Mail        bool
 	SmtpHost    string
@@ -54,14 +66,16 @@ type Config struct {
 }
 
 func LoadConfig() *Config {
+	// Tải file .env từ thư mục hiện tại
 	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
+		log.Println("Warning: Can't load .env file, will read from environment variables")
 	}
-	maxThreads, err := strconv.Atoi(os.Getenv("MAX_CONCURRENT_BACKUPS"))
 
-	if err != nil || maxThreads < 1 {
-		maxThreads = 2 // fallback nếu không hợp lệ
+	mydumperThreads, err := strconv.Atoi(os.Getenv("MYDUMPER_THREADS"))
+	if err != nil || mydumperThreads < 1 {
+		mydumperThreads = 4 // fallback mặc định
 	}
+
 	return &Config{
 		BackupSchedule: os.Getenv("BACKUP_SCHEDULE"),
 		DBNames:        strings.Fields(os.Getenv("DBNAMES")),
@@ -73,21 +87,34 @@ func LoadConfig() *Config {
 		DBTablesMatch:  os.Getenv("DBTABLESMATCH"),
 		DBOptions:      strings.Fields(os.Getenv("DBOPTIONS")),
 
-		BackupDir:     os.Getenv("BACKUP_DIR"),
 		LogFile:       os.Getenv("LOGFILE"),
-		LogTimeFormat: os.Getenv("LOG_TIME_FORMAT"),
+		LogTimeFormat: getEnv("LOG_TIME_FORMAT", "02/01/2006 15:04:05"),
 
-		CompressionCmd: os.Getenv("COMPRESSION_COMMAND"),
-		CompressionExt: os.Getenv("COMPRESSION_EXTENSION"),
+		MydumperCmd:     getEnv("MYDUMPER_CMD", "mydumper"),
+		MydumperThreads: mydumperThreads,
+		MydumperOptions: strings.Fields(os.Getenv("MYDUMPER_OPTIONS")),
 
 		RemoveOld: os.Getenv("DELETE") == "y",
-		Days:      parseEnvInt("DAYS", 30),
+		Days:      parseEnvInt("DAYS", 7),
 		Months:    parseEnvInt("MONTHS", 3),
 
-		Telegram:             os.Getenv("TELEGRAM") == "y",
-		BotToken:             os.Getenv("BOTTOKEN"),
-		ChatID:               os.Getenv("CHATID"),
-		MaxConcurrentBackups: maxThreads,
+		LocalEnabled: os.Getenv("LOCAL_ENABLED") == "y",
+		LocalDir:     os.Getenv("LOCAL_DIR"),
+
+		NfsEnabled: os.Getenv("NFS_ENABLED") == "y",
+		NfsDir:     os.Getenv("NFS_DIR"),
+
+		S3Enabled:        os.Getenv("S3_ENABLED") == "y",
+		S3Bucket:         os.Getenv("S3_BUCKET"),
+		S3Region:         os.Getenv("S3_REGION"),
+		S3Endpoint:       os.Getenv("S3_ENDPOINT"),
+		S3AccessKey:      os.Getenv("S3_ACCESS_KEY"),
+		S3SecretKey:      os.Getenv("S3_SECRET_KEY"),
+		S3ForcePathStyle: os.Getenv("S3_FORCE_PATH_STYLE") == "y",
+
+		Telegram: os.Getenv("TELEGRAM") == "y",
+		BotToken: os.Getenv("BOTTOKEN"),
+		ChatID:   os.Getenv("CHATID"),
 
 		Lark:             os.Getenv("LARK") == "y",
 		LarkUrl:          os.Getenv("LARK_URL"),
@@ -101,6 +128,13 @@ func LoadConfig() *Config {
 		MailSubject: os.Getenv("MAIL_SUBJECT"),
 		Emails:      os.Getenv("EMAILS"),
 	}
+}
+
+func getEnv(key, defaultVal string) string {
+	if val := os.Getenv(key); val != "" {
+		return val
+	}
+	return defaultVal
 }
 
 func parseEnvInt(key string, defaultVal int) int {

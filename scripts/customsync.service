@@ -1,0 +1,19 @@
+[Unit]
+Description=Sync Service
+After=network.target mnt-gluster\x2dclient.mount
+Wants=mnt-gluster\x2dclient.mount
+
+[Service]
+Type=simple
+ExecStart=/bin/bash /usr/local/bin/gfs-dynamic-sync.sh
+# Tự động khởi động lại sau 5 giây nếu script bị crash
+Restart=always
+RestartSec=5
+# Giới hạn quyền chạy script (nên để root vì liên quan đến lệnh mount và tạo thư mục khách hàng)
+User=root
+# Ghi log chuẩn ra syslog của hệ thống
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
